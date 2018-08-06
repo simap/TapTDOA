@@ -1,0 +1,5 @@
+intersection points of circles
+https://gist.github.com/jupdike/bfe5eb23d1c395d8a0a1a4ddd94882ac
+
+toa and tdoa
+https://sites.tufts.edu/eeseniordesignhandbook/files/2017/05/FireBrick_OKeefe_F1.pdf
