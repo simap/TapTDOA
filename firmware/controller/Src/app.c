@@ -1,4 +1,3 @@
-
 #include "stm32f3xx_hal.h"
 #include "usb_device.h"
 #include "app.h"
@@ -27,36 +26,36 @@ extern OPAMP_HandleTypeDef hopamp4;
 
 extern UART_HandleTypeDef huart1;
 
-extern int16_t firBandpass[];
 extern const uint16_t sample1[];
 extern const uint16_t sample2[];
 extern const uint16_t sample3[];
 extern const uint16_t sample4[];
 
-#define ADC_BUF_SIZE (1024*3)
-#define POST_TRIGGER_SAMPLES (ADC_BUF_SIZE - 512)
-#define XCORR_WINDOW_SIZE 1024
-#define XCORR_SIZE (XCORR_WINDOW_SIZE*2) //need 2x window for cross correlation result
+#define BP_NUM_TAPS              32
+const q15_t firBandpass[] = { 84, 251, 458, 657, 700, 422, -254, -1223, -2182,
+		-2734, -2541, -1496, 196, 2057, 3498, 4040, 3498, 2057, 196, -1496,
+		-2541, -2734, -2182, -1223, -254, 422, 700, 657, 458, 251, 84, 0 };
 
-#define BLOCK_SIZE            32
-#define NUM_TAPS              800
+#define LP_NUM_TAPS 22
+const q15_t firLowPass[] = { 229, 296, 491, 796, 1184, 1618, 2055, 2451, 2767,
+		2971, 3041, 2971, 2767, 2451, 2055, 1618, 1184, 796, 491, 296, 229, 0 };
 
+#define ADC_BUF_SIZE (1024*4)
 int16_t cbuf[4][ADC_BUF_SIZE];
-q15_t filtered[4][ADC_BUF_SIZE];
-
+q15_t tmpBuf[ADC_BUF_SIZE];
 uint32_t peakIndex[4];
-q15_t xcorr[XCORR_SIZE];
-q15_t firState[BLOCK_SIZE + NUM_TAPS];
+
+#define BLOCK_SIZE            64
+q15_t firState[BLOCK_SIZE + BP_NUM_TAPS];
 
 uint32_t blockSize = BLOCK_SIZE;
 uint32_t numBlocks = ADC_BUF_SIZE / BLOCK_SIZE;
 
-
-volatile int16_t triggerCountdown;
 static volatile bool triggerDone = false;
 int dmaCndtr;
 
 volatile uint32_t ms;
+uint32_t lastHitMs = 0;
 
 volatile enum {
 	WAITING, CAPTURING, IGNORENEXT
@@ -94,37 +93,55 @@ volatile enum {
  * TODO ws2812: if we need to interrupt at 800khz, thats about every 90 cycles. too much? maybe clock stretch?
  */
 
-
 void setAdcWd(uint16_t low, uint16_t high) {
-	uint32_t tr1 = (high<<16) | low;
+	uint32_t tr1 = (high << 16) | low;
 	ADC1->TR1 = tr1;
 	ADC2->TR1 = tr1;
 	ADC3->TR1 = tr1;
 	ADC4->TR1 = tr1;
 }
 
-uint32_t findXCorrelationDelay(int ch1, int ch2) {
-    //cross correlate a window, finding the peak correlation
+void setOpAmpGainAndDac(int gain) {
 
-    memset(&xcorr[0], 0, sizeof(q15_t) * XCORR_SIZE);
+	//	VM_SEL
+	//	10: Resistor feedback output (PGA mode)
+	//	11: follower mode
+	uint32_t csr;
+	switch(gain) {
+		case 1:
+			csr = 0b11 << OPAMP1_CSR_VMSEL_Pos; //set to follower
+			break;
+		case 2:
+			csr = OPAMP_PGA_GAIN_2 | 0b10 << OPAMP1_CSR_VMSEL_Pos;
+			break;
+		case 4:
+			csr = OPAMP_PGA_GAIN_4 | 0b10 << OPAMP1_CSR_VMSEL_Pos;
+			break;
+		case 8:
+			csr = OPAMP_PGA_GAIN_8 | 0b10 << OPAMP1_CSR_VMSEL_Pos;
+			break;
+		case 16:
+			csr = OPAMP_PGA_GAIN_16 | 0b10 << OPAMP1_CSR_VMSEL_Pos;
+			break;
+		default:
+			HardFault_Handler();
+	}
 
-    int startOffset1 = peakIndex[ch1] - XCORR_WINDOW_SIZE / 2;
-    int startOffset2 = peakIndex[ch2] - XCORR_WINDOW_SIZE / 2;
-    arm_correlate_q15(filtered[ch1] + startOffset1, XCORR_WINDOW_SIZE,
-                      filtered[ch2] + startOffset2, XCORR_WINDOW_SIZE,
-                      &xcorr[0]);
+	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 2048/gain, 2048/gain);
 
-    //find the peak correlation
-    q15_t unused;
-    uint32_t index;
-    arm_max_q15(&xcorr[0], XCORR_SIZE, &unused, &index);
-    return XCORR_WINDOW_SIZE - index +  peakIndex[ch2] - peakIndex[ch1];
+	MODIFY_REG(hopamp1.Instance->CSR, OPAMP_CSR_PGGAIN_Msk | OPAMP_CSR_VMSEL_Msk, csr);
+	MODIFY_REG(hopamp2.Instance->CSR, OPAMP_CSR_PGGAIN_Msk | OPAMP_CSR_VMSEL_Msk, csr);
+	MODIFY_REG(hopamp3.Instance->CSR, OPAMP_CSR_PGGAIN_Msk | OPAMP_CSR_VMSEL_Msk, csr);
+	MODIFY_REG(hopamp4.Instance->CSR, OPAMP_CSR_PGGAIN_Msk | OPAMP_CSR_VMSEL_Msk, csr);
+
 }
 
 void setup() {
 
-
 	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
+
+//	setOpAmpGainAndDac(4);
+
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
 
 	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
@@ -154,9 +171,6 @@ void setup() {
 
 //	DBGMCU->APB1FZ = 0xffff;
 //	DBGMCU->APB2FZ = 0xffff;
-
-	return;
-
 
 	LL_TIM_ClearFlag_UPDATE(TIM3);
 	LL_TIM_EnableIT_UPDATE(TIM3);
@@ -189,99 +203,108 @@ void armAdcWatchdogs(void) {
 	SET_BIT(hadc4.Instance->IER, ADC_IER_AWD1IE);
 }
 
-uint32_t timer = 0;
 
-uint32_t timer2 = 0;
-uint32_t timer3 = 0;
+void analyzeDelays() {
 
+	uint32_t timer = 0;
+	uint32_t timer2 = 0;
+	uint32_t timer3 = 0;
+	q15_t avg;
+	int channel;
+	timer = ms;
+	//filter out the DC
+	for (channel = 0; channel < 4; channel++) {
+		arm_mean_q15(cbuf[channel], 100, &avg);
+		arm_offset_q15(cbuf[channel], -avg, cbuf[channel], ADC_BUF_SIZE);
+
+		//normalize
+		q15_t min, max;
+		uint32_t unused;
+		arm_min_q15(cbuf[channel], ADC_BUF_SIZE, &min, &unused);
+		arm_max_q15(cbuf[channel], ADC_BUF_SIZE, &max, &unused);
+		min = min < 0 ? -min : min;
+		max = max >= min ? max : min;
+		int32_t r = 0x3FFFFFFF / max;
+		int8_t bits = 1;
+		while (r > 0x7fff) {
+			bits++;
+			r >>= 1;
+		}
+		arm_scale_q15(cbuf[channel], r, bits - 1, cbuf[channel], ADC_BUF_SIZE);
+
+		//bandpass FIR filter to get our signal. cbuf -> tmp
+		arm_fir_instance_q15 S;
+		uint32_t numBlocks = ADC_BUF_SIZE / BLOCK_SIZE;
+		arm_fir_init_q15(&S, BP_NUM_TAPS, firBandpass, firState, BLOCK_SIZE);
+		for (int i = 0; i < numBlocks; i++) {
+			arm_fir_fast_q15(&S, &cbuf[channel][0] + (i * blockSize),
+					&tmpBuf[0] + (i * blockSize), blockSize);
+		}
+
+		//abs and run through lowpass. tmp -> cbuf
+		arm_fir_init_q15(&S, LP_NUM_TAPS, firLowPass, firState, BLOCK_SIZE);
+		arm_abs_q15(&tmpBuf[0], &tmpBuf[0], ADC_BUF_SIZE);
+		for (int i = 0; i < numBlocks; i++) {
+			arm_fir_fast_q15(&S, &tmpBuf[0] + (i * blockSize),
+					&cbuf[channel][0] + (i * blockSize), blockSize);
+		}
+
+		//find edge
+		peakIndex[channel] = 0;
+		for (int i = 0; i < ADC_BUF_SIZE; i++) {
+			if (cbuf[channel][i] > 983) {
+				peakIndex[channel] = i;
+				break;
+			}
+		}
+		timer2 = ms - timer;
+	}
+	timer3 = ms - timer;
+
+	volatile int16_t delay12 = peakIndex[1] - peakIndex[0];
+	volatile int16_t delay13 = peakIndex[2] - peakIndex[0];
+	volatile int16_t delay14 = peakIndex[3] - peakIndex[0];
+
+	printf("hit: %d, %d, %d, %d, deltas: %d, %d, %d in %dms\n", peakIndex[0],
+			peakIndex[1], peakIndex[2], peakIndex[3], delay12, delay13,
+			delay14, timer3);
+}
 
 void loop() {
 
+#if 0
+	memcpy(cbuf[0], sample1 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
+	memcpy(cbuf[1], sample2 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
+	memcpy(cbuf[2], sample3 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
+	memcpy(cbuf[3], sample4 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
 
-//	if (ms - timer >= 1000) {
-//		timer += 1000;
-//		printf("Hello %d\n", ms);
-//	}
-//	return;
-
-    q15_t avg;
-    int channel;
-
-    memcpy(cbuf[0], sample1 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
-    memcpy(cbuf[1], sample2 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
-    memcpy(cbuf[2], sample3 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
-    memcpy(cbuf[3], sample4 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
-
-    timer = ms;
-
-    //filter out the DC
-    for (channel = 0; channel < 4; channel++) {
-        arm_mean_q15(cbuf[channel], 100, &avg);
-        arm_offset_q15(cbuf[channel], -avg, cbuf[channel], ADC_BUF_SIZE);
-    }
-
-    //hack ch1 and ch4 had reversed polarity
-    for (int i = 0; i < ADC_BUF_SIZE; i++) {
-    	cbuf[0][i] = -cbuf[0][i];
-    	cbuf[3][i] = -cbuf[3][i];
-    }
-
-
-    //bandpass FIR filter
-    arm_fir_instance_q15 S;
-    for (channel = 0; channel < 4; channel++) {
-        arm_fir_init_q15(&S, NUM_TAPS, &firBandpass[0], firState, BLOCK_SIZE);
-        for (int i = 0; i < numBlocks; i++) {
-            arm_fir_q15(&S, cbuf[channel] + (i * blockSize), filtered[channel] + (i * blockSize), blockSize);
-        }
-    }
-
-    //find peaks
-    for (channel = 0; channel < 4; channel++) {
-        q15_t unused;
-        arm_max_q15(&filtered[channel][0], ADC_BUF_SIZE, &unused, &peakIndex[channel]);
-
-        //make sure peak index isn't too close to bounds
-//        int startOffset = peakIndex[channel] - XCORR_WINDOW_SIZE / 2;
-//        if (startOffset < 0)
-//            peakIndex[channel] = XCORR_WINDOW_SIZE / 2;
-//        if (startOffset + XCORR_WINDOW_SIZE > ADC_BUF_SIZE)
-//            peakIndex[channel] = ADC_BUF_SIZE - XCORR_WINDOW_SIZE / 2;
-    }
-    timer2 = ms - timer;
-
-    volatile int delay12 = findXCorrelationDelay(0,1);
-    timer3 = ms - timer;
-    volatile int delay13 = findXCorrelationDelay(0,2);
-    volatile int delay14 = findXCorrelationDelay(0,3);
-
-    volatile uint32_t totalMs = ms - timer;
-
-
+	analyzeDelays();
 	HAL_Delay(1000);
-
 
 	return;
 
-
+#endif
 
 	if (triggerDone) {
+		if (ms - lastHitMs > 500) {
 
-
-		printf("Trigger at %d\n", dmaCndtr);
-
-		for (int i = 0; i < ADC_BUF_SIZE; i++) {
-			int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
-			for (int k = 0; k < 4; k++) {
-				printf("%u\t", cbuf[k][index]);
+#if 1
+			printf("Trigger at %d\nch1\tch2\tch3\tch4\n", dmaCndtr);
+			for (int i = 0; i < ADC_BUF_SIZE; i++) {
+				int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
+				printf("%u\t%u\t%u\t%u\n", cbuf[0][index], cbuf[1][index], cbuf[2][index], cbuf[3][index]);
 			}
-			printf("\n");
+			printf("=========\n");
+#endif
+
+			analyzeDelays();
+
 		}
-		printf("=========\n");
+		lastHitMs = ms;
 
 		LL_TIM_EnableCounter(TIM3);
+		HAL_Delay(2);
 
-		HAL_Delay(300);
 		triggerDone = false;
 		//TODO figure out why adc watchdog keeps firing immediately after it gets reenabled
 		triggerMode = WAITING;
@@ -293,7 +316,6 @@ void loop() {
 void startEventCapture() {
 
 	disarmAdcWatchdogs();
-	triggerCountdown = POST_TRIGGER_SAMPLES;
 	triggerMode = CAPTURING;
 
 	LL_TIM_EnableCounter(TIM2);
