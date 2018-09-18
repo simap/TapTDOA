@@ -1,6 +1,7 @@
 #include "stm32f3xx_hal.h"
 #include "usb_device.h"
 #include "app.h"
+#include "pixelBlaster.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -24,6 +25,9 @@ extern OPAMP_HandleTypeDef hopamp2;
 extern OPAMP_HandleTypeDef hopamp3;
 extern OPAMP_HandleTypeDef hopamp4;
 
+extern TIM_HandleTypeDef htim4;
+extern DMA_HandleTypeDef hdma_tim4_up;
+
 extern UART_HandleTypeDef huart1;
 
 extern const uint16_t sample1[];
@@ -31,18 +35,23 @@ extern const uint16_t sample2[];
 extern const uint16_t sample3[];
 extern const uint16_t sample4[];
 
+#define LED_BUFFER_SIZE (40*24*8/2)
+uint8_t ledBuffer[LED_BUFFER_SIZE];
+PixelBlasterData pb;
+
+
 #define BP_NUM_TAPS              32
-const q15_t firBandpass[] = { 84, 251, 458, 657, 700, 422, -254, -1223, -2182,
-		-2734, -2541, -1496, 196, 2057, 3498, 4040, 3498, 2057, 196, -1496,
-		-2541, -2734, -2182, -1223, -254, 422, 700, 657, 458, 251, 84, 0 };
+//low pass around 8k
+const q15_t fir1[] = {
+		11, 29, 63, 123, 220, 362, 551, 783, 1052, 1344, 1641,
+		1923, 2169, 2361, 2482, 2524, 2482, 2361, 2169, 1923, 1641, 1344, 1052,
+		783, 551, 362, 220, 123, 63, 29, 11, 0 };
 
-#define LP_NUM_TAPS 22
-const q15_t firLowPass[] = { 229, 296, 491, 796, 1184, 1618, 2055, 2451, 2767,
-		2971, 3041, 2971, 2767, 2451, 2055, 1618, 1184, 796, 491, 296, 229, 0 };
 
-#define ADC_BUF_SIZE (1024*4)
+#define ADC_BUF_SIZE (1024*3)
 int16_t cbuf[4][ADC_BUF_SIZE];
 q15_t tmpBuf[ADC_BUF_SIZE];
+q15_t tmpBuf2[ADC_BUF_SIZE];
 uint32_t peakIndex[4];
 
 #define BLOCK_SIZE            64
@@ -138,17 +147,29 @@ void setOpAmpGainAndDac(int gain) {
 
 void setup() {
 
-	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
+	pbInit(&pb, ledBuffer, LED_BUFFER_SIZE);
+	memset(ledBuffer, 0, LED_BUFFER_SIZE);
+
+//	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
+	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 512, 512);
 
 //	setOpAmpGainAndDac(4);
 
+//	MODIFY_REG(hopamp1.Instance->CSR, OPAMP_CSR_PGGAIN_Msk, OPAMP_PGA_GAIN_2);
+//	MODIFY_REG(hopamp2.Instance->CSR, OPAMP_CSR_PGGAIN_Msk, OPAMP_PGA_GAIN_2);
+//	MODIFY_REG(hopamp3.Instance->CSR, OPAMP_CSR_PGGAIN_Msk, OPAMP_PGA_GAIN_2);
+//	MODIFY_REG(hopamp4.Instance->CSR, OPAMP_CSR_PGGAIN_Msk, OPAMP_PGA_GAIN_2);
+
 	HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+
+	HAL_Delay(100);
 
 	HAL_ADCEx_Calibration_Start(&hadc1, ADC_SINGLE_ENDED);
 	HAL_ADCEx_Calibration_Start(&hadc2, ADC_SINGLE_ENDED);
 	HAL_ADCEx_Calibration_Start(&hadc3, ADC_SINGLE_ENDED);
 	HAL_ADCEx_Calibration_Start(&hadc4, ADC_SINGLE_ENDED);
 
+	//TODO try without calibrating, seems off anyway.
 	HAL_OPAMP_SelfCalibrate(&hopamp1);
 	HAL_OPAMP_SelfCalibrate(&hopamp2);
 	HAL_OPAMP_SelfCalibrate(&hopamp3);
@@ -164,7 +185,9 @@ void setup() {
 	HAL_ADC_Start_DMA(&hadc3, (uint32_t *) &cbuf[2][0], ADC_BUF_SIZE);
 	HAL_ADC_Start_DMA(&hadc4, (uint32_t *) &cbuf[3][0], ADC_BUF_SIZE);
 
-	setAdcWd(1925 - 100, 1925 + 100);
+//	disarmAdcWatchdogs();
+	setAdcWd(2020 - 75, 2020 + 75);
+
 
 	//let things settle on powerup
 	HAL_Delay(100);
@@ -179,8 +202,11 @@ void setup() {
 	LL_TIM_EnableIT_UPDATE(TIM2);
 
 	LL_TIM_EnableCounter(TIM3);
+	LL_TIM_EnableCounter(TIM4);
 
-// 	arm_cfft_q15(0, 0,0, 0);
+	//tim4 is used to spit out pixel data to gpio
+	TIM4->DIER |= TIM_DIER_UDE; //Update DMA request enable
+	HAL_TIM_Base_Start(&htim4);
 
 }
 
@@ -203,60 +229,64 @@ void armAdcWatchdogs(void) {
 	SET_BIT(hadc4.Instance->IER, ADC_IER_AWD1IE);
 }
 
+int findNextPeak(int dir, q15_t tmpBuf[], int start, int length, int * foundIndex, q15_t * foundValue) {
+	for (int i = start; i >= 0 && i < length; i += dir) {
+
+	}
+}
+
 
 void analyzeDelays() {
 
-	uint32_t timer = 0;
-	uint32_t timer2 = 0;
-	uint32_t timer3 = 0;
+	volatile uint32_t timer = 0;
+	volatile uint32_t timer2 = 0;
+	volatile uint32_t timer3 = 0;
 	q15_t avg;
 	int channel;
 	timer = ms;
 	//filter out the DC
 	for (channel = 0; channel < 4; channel++) {
-		arm_mean_q15(cbuf[channel], 100, &avg);
-		arm_offset_q15(cbuf[channel], -avg, cbuf[channel], ADC_BUF_SIZE);
 
-		//normalize
-		q15_t min, max;
-		uint32_t unused;
-		arm_min_q15(cbuf[channel], ADC_BUF_SIZE, &min, &unused);
-		arm_max_q15(cbuf[channel], ADC_BUF_SIZE, &max, &unused);
-		min = min < 0 ? -min : min;
-		max = max >= min ? max : min;
-		int32_t r = 0x3FFFFFFF / max;
-		int8_t bits = 1;
-		while (r > 0x7fff) {
-			bits++;
-			r >>= 1;
+		int startIndex = ADC_BUF_SIZE - dmaCndtr;
+		//copy, align to tmp
+		memcpy(&tmpBuf[0], &cbuf[channel][startIndex], (ADC_BUF_SIZE - startIndex) * sizeof(q15_t));
+
+		if (startIndex != 0) {
+			memcpy(&tmpBuf[ADC_BUF_SIZE - startIndex], &cbuf[channel][0], startIndex * sizeof(q15_t));
 		}
-		arm_scale_q15(cbuf[channel], r, bits - 1, cbuf[channel], ADC_BUF_SIZE);
 
-		//bandpass FIR filter to get our signal. cbuf -> tmp
+		//remove dc. tmp -> tmp
+		arm_mean_q15(&tmpBuf[0], 100, &avg);
+		arm_offset_q15(&tmpBuf[0], -avg, &tmpBuf[0], ADC_BUF_SIZE);
+
+		//bandpass FIR filter to get our signal. tmp -> tmp2
 		arm_fir_instance_q15 S;
-		uint32_t numBlocks = ADC_BUF_SIZE / BLOCK_SIZE;
-		arm_fir_init_q15(&S, BP_NUM_TAPS, firBandpass, firState, BLOCK_SIZE);
-		for (int i = 0; i < numBlocks; i++) {
-			arm_fir_fast_q15(&S, &cbuf[channel][0] + (i * blockSize),
-					&tmpBuf[0] + (i * blockSize), blockSize);
-		}
-
-		//abs and run through lowpass. tmp -> cbuf
-		arm_fir_init_q15(&S, LP_NUM_TAPS, firLowPass, firState, BLOCK_SIZE);
-		arm_abs_q15(&tmpBuf[0], &tmpBuf[0], ADC_BUF_SIZE);
+		arm_fir_init_q15(&S, BP_NUM_TAPS, fir1, firState, BLOCK_SIZE);
 		for (int i = 0; i < numBlocks; i++) {
 			arm_fir_fast_q15(&S, &tmpBuf[0] + (i * blockSize),
-					&cbuf[channel][0] + (i * blockSize), blockSize);
+					&tmpBuf2[0] + (i * blockSize), blockSize);
 		}
 
-		//find edge
+		//abs tmp2 -> tmp
+		arm_abs_q15(&tmpBuf2[0], &tmpBuf[0], ADC_BUF_SIZE);
+
+//		printf("ch %d\n", channel);
+//		for (int i = 0; i < ADC_BUF_SIZE; i+= 8) {
+//			printf("%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n",
+//					tmpBuf[i], tmpBuf[i+1], tmpBuf[i+2], tmpBuf[i+3],
+//					tmpBuf[i+4], tmpBuf[i+5], tmpBuf[i+6], tmpBuf[i+7] );
+//		}
+		//find an edge, then find some peaks to fit a line
 		peakIndex[channel] = 0;
-		for (int i = 0; i < ADC_BUF_SIZE; i++) {
-			if (cbuf[channel][i] > 983) {
-				peakIndex[channel] = i;
-				break;
-			}
-		}
+		int searchStart;
+		for (searchStart = 0; searchStart < ADC_BUF_SIZE && tmpBuf[searchStart] < 10; searchStart++)
+			;
+		int foundIndex;
+		q15_t foundValue;
+		findNextPeak(-1, tmpBuf, searchStart, ADC_BUF_SIZE, &foundIndex, &foundValue);
+
+
+
 		timer2 = ms - timer;
 	}
 	timer3 = ms - timer;
@@ -270,7 +300,20 @@ void analyzeDelays() {
 			delay14, timer3);
 }
 
+uint32_t helloTimer;
+
 void loop() {
+//	if (ms - helloTimer > 5000) {
+//		helloTimer = ms;
+//		printf("hi\n");
+//	}
+
+	if (HAL_DMA_GetState(&hdma_tim4_up) == HAL_DMA_STATE_READY && pbCheckDone(&pb)) {
+		//TODO reset the timer counter or it can cut clocks, this seems to transfer immediately
+		HAL_DMA_Start_IT(&hdma_tim4_up, ledBuffer, &GPIOB->ODR, LED_BUFFER_SIZE);
+	}
+
+
 
 #if 0
 	memcpy(cbuf[0], sample1 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
@@ -288,7 +331,7 @@ void loop() {
 	if (triggerDone) {
 		if (ms - lastHitMs > 500) {
 
-#if 1
+#if 0
 			printf("Trigger at %d\nch1\tch2\tch3\tch4\n", dmaCndtr);
 			for (int i = 0; i < ADC_BUF_SIZE; i++) {
 				int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
@@ -298,9 +341,9 @@ void loop() {
 #endif
 
 			analyzeDelays();
+			lastHitMs = ms;
 
 		}
-		lastHitMs = ms;
 
 		LL_TIM_EnableCounter(TIM3);
 		HAL_Delay(2);
