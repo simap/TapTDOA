@@ -40,25 +40,7 @@ uint8_t ledBuffer[LED_BUFFER_SIZE];
 PixelBlasterData pb;
 
 
-#define BP_NUM_TAPS              32
-//low pass around 8k
-const q15_t fir1[] = {
-		11, 29, 63, 123, 220, 362, 551, 783, 1052, 1344, 1641,
-		1923, 2169, 2361, 2482, 2524, 2482, 2361, 2169, 1923, 1641, 1344, 1052,
-		783, 551, 362, 220, 123, 63, 29, 11, 0 };
-
-
-#define ADC_BUF_SIZE (1024*3)
 int16_t cbuf[4][ADC_BUF_SIZE];
-q15_t tmpBuf[ADC_BUF_SIZE];
-q15_t tmpBuf2[ADC_BUF_SIZE];
-uint32_t peakIndex[4];
-
-#define BLOCK_SIZE            64
-q15_t firState[BLOCK_SIZE + BP_NUM_TAPS];
-
-uint32_t blockSize = BLOCK_SIZE;
-uint32_t numBlocks = ADC_BUF_SIZE / BLOCK_SIZE;
 
 static volatile bool triggerDone = false;
 int dmaCndtr;
@@ -229,76 +211,7 @@ void armAdcWatchdogs(void) {
 	SET_BIT(hadc4.Instance->IER, ADC_IER_AWD1IE);
 }
 
-int findNextPeak(int dir, q15_t tmpBuf[], int start, int length, int * foundIndex, q15_t * foundValue) {
-	for (int i = start; i >= 0 && i < length; i += dir) {
 
-	}
-}
-
-
-void analyzeDelays() {
-
-	volatile uint32_t timer = 0;
-	volatile uint32_t timer2 = 0;
-	volatile uint32_t timer3 = 0;
-	q15_t avg;
-	int channel;
-	timer = ms;
-	//filter out the DC
-	for (channel = 0; channel < 4; channel++) {
-
-		int startIndex = ADC_BUF_SIZE - dmaCndtr;
-		//copy, align to tmp
-		memcpy(&tmpBuf[0], &cbuf[channel][startIndex], (ADC_BUF_SIZE - startIndex) * sizeof(q15_t));
-
-		if (startIndex != 0) {
-			memcpy(&tmpBuf[ADC_BUF_SIZE - startIndex], &cbuf[channel][0], startIndex * sizeof(q15_t));
-		}
-
-		//remove dc. tmp -> tmp
-		arm_mean_q15(&tmpBuf[0], 100, &avg);
-		arm_offset_q15(&tmpBuf[0], -avg, &tmpBuf[0], ADC_BUF_SIZE);
-
-		//bandpass FIR filter to get our signal. tmp -> tmp2
-		arm_fir_instance_q15 S;
-		arm_fir_init_q15(&S, BP_NUM_TAPS, fir1, firState, BLOCK_SIZE);
-		for (int i = 0; i < numBlocks; i++) {
-			arm_fir_fast_q15(&S, &tmpBuf[0] + (i * blockSize),
-					&tmpBuf2[0] + (i * blockSize), blockSize);
-		}
-
-		//abs tmp2 -> tmp
-		arm_abs_q15(&tmpBuf2[0], &tmpBuf[0], ADC_BUF_SIZE);
-
-//		printf("ch %d\n", channel);
-//		for (int i = 0; i < ADC_BUF_SIZE; i+= 8) {
-//			printf("%d\n%d\n%d\n%d\n%d\n%d\n%d\n%d\n",
-//					tmpBuf[i], tmpBuf[i+1], tmpBuf[i+2], tmpBuf[i+3],
-//					tmpBuf[i+4], tmpBuf[i+5], tmpBuf[i+6], tmpBuf[i+7] );
-//		}
-		//find an edge, then find some peaks to fit a line
-		peakIndex[channel] = 0;
-		int searchStart;
-		for (searchStart = 0; searchStart < ADC_BUF_SIZE && tmpBuf[searchStart] < 10; searchStart++)
-			;
-		int foundIndex;
-		q15_t foundValue;
-		findNextPeak(-1, tmpBuf, searchStart, ADC_BUF_SIZE, &foundIndex, &foundValue);
-
-
-
-		timer2 = ms - timer;
-	}
-	timer3 = ms - timer;
-
-	volatile int16_t delay12 = peakIndex[1] - peakIndex[0];
-	volatile int16_t delay13 = peakIndex[2] - peakIndex[0];
-	volatile int16_t delay14 = peakIndex[3] - peakIndex[0];
-
-	printf("hit: %d, %d, %d, %d, deltas: %d, %d, %d in %dms\n", peakIndex[0],
-			peakIndex[1], peakIndex[2], peakIndex[3], delay12, delay13,
-			delay14, timer3);
-}
 
 uint32_t helloTimer;
 
@@ -308,11 +221,6 @@ void loop() {
 //		printf("hi\n");
 //	}
 
-	if (HAL_DMA_GetState(&hdma_tim4_up) == HAL_DMA_STATE_READY && pbCheckDone(&pb)) {
-		//TODO reset the timer counter or it can cut clocks, this seems to transfer immediately
-		HAL_DMA_Start_IT(&hdma_tim4_up, ledBuffer, &GPIOB->ODR, LED_BUFFER_SIZE);
-	}
-
 
 
 #if 0
@@ -321,12 +229,20 @@ void loop() {
 	memcpy(cbuf[2], sample3 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
 	memcpy(cbuf[3], sample4 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
 
-	analyzeDelays();
+	analyzeDelays(cbuf, 0);
 	HAL_Delay(1000);
 
 	return;
 
 #endif
+
+	if (HAL_DMA_GetState(&hdma_tim4_up) == HAL_DMA_STATE_READY && pbCheckDone(&pb)) {
+		//TODO reset the timer counter or it can cut clocks, this seems to transfer immediately
+		htim4.Instance->CNT = 0;
+		HAL_DMA_Start_IT(&hdma_tim4_up, ledBuffer, &GPIOB->ODR, LED_BUFFER_SIZE);
+	}
+
+
 
 	if (triggerDone) {
 		if (ms - lastHitMs > 500) {
@@ -340,7 +256,7 @@ void loop() {
 			printf("=========\n");
 #endif
 
-			analyzeDelays();
+			analyzeDelays(cbuf, dmaCndtr);
 			lastHitMs = ms;
 
 		}
