@@ -133,7 +133,7 @@ void setup() {
 	memset(ledBuffer, 0, LED_BUFFER_SIZE);
 
 //	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
-	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 512, 512);
+	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 1024, 1024);
 
 //	setOpAmpGainAndDac(4);
 
@@ -247,16 +247,18 @@ void loop() {
 	if (triggerDone) {
 		if (ms - lastHitMs > 500) {
 
-#if 0
-			printf("Trigger at %d\nch1\tch2\tch3\tch4\n", dmaCndtr);
-			for (int i = 0; i < ADC_BUF_SIZE; i++) {
-				int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
-				printf("%u\t%u\t%u\t%u\n", cbuf[0][index], cbuf[1][index], cbuf[2][index], cbuf[3][index]);
-			}
-			printf("=========\n");
-#endif
+			int res = analyzeDelays(cbuf, dmaCndtr);
 
-			analyzeDelays(cbuf, dmaCndtr);
+			if (res) {
+				printf("Dump raw data:\nch1\tch2\tch3\tch4\n", dmaCndtr);
+				for (int i = 0; i < ADC_BUF_SIZE; i++) {
+					int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
+					printf("%u\t%u\t%u\t%u\n", cbuf[0][index], cbuf[1][index], cbuf[2][index], cbuf[3][index]);
+				}
+				printf("=========\n");
+			}
+
+
 			lastHitMs = ms;
 
 		}

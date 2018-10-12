@@ -30,17 +30,21 @@ q15_t tmpBuf[ADC_BUF_SIZE];
 q15_t tmpBuf2[ADC_BUF_SIZE];
 uint32_t peakIndex[4];
 
+#define MAX_PEAKS 4
+int peaks[4][MAX_PEAKS] = { 0 };
+
+
 #define BLOCK_SIZE            64
 q15_t firState[BLOCK_SIZE + BP_NUM_TAPS];
 
 uint32_t blockSize = BLOCK_SIZE;
 uint32_t numBlocks = ADC_BUF_SIZE / BLOCK_SIZE;
 
-int findThreshold(q15_t *pInt, int size, q15_t threshold);
+int findThreshold(q15_t *pInt, int size, int start, q15_t threshold);
 int findPeaks(int *peaks, int peaksSize, q15_t *data, int size, int start,
 		int dir, q15_t threshold, int maxDistance);
 
-void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
+int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 	volatile uint32_t timer = 0;
 	volatile uint32_t timer2 = 0;
@@ -111,32 +115,36 @@ void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		//peak detection: max value or find the center? even with max, if it plateaus?
 
+		memset(peaks[channel], 0, MAX_PEAKS * sizeof(peaks[0][0]));
+
 		q15_t threshold, maxValue;
 		uint32_t maxIndex;
 		arm_max_q15(tmpBuf, ADC_BUF_SIZE, &maxValue, &maxIndex);
 
-		threshold = maxValue / 5;
-		int start = findThreshold(tmpBuf, ADC_BUF_SIZE, threshold);
+		threshold = maxValue / 2;
+		int start = findThreshold(tmpBuf, ADC_BUF_SIZE, 0, threshold);
+
+#if DEBUG_DATA
+		printf("max=%d\t@%d\tthresh=%d\tstart=%d\n", maxValue, maxIndex, threshold, start);
+#endif
 
 		threshold = maxValue / 25;
-		threshold = threshold > 10 ? threshold : 10;
-		const int maxPeaks = 4;
-		int peaks[6] = { 0 };
-		int found = findPeaks(peaks, 2, tmpBuf, ADC_BUF_SIZE, start, -1,
+		threshold = threshold > 5 ? threshold : 5;
+		int found = findPeaks(peaks[channel], 2, tmpBuf, ADC_BUF_SIZE, start, -1,
 				threshold, 50);
 
 		threshold = maxValue / 5;
-		found += findPeaks(peaks + found, maxPeaks - found, tmpBuf,
+		found += findPeaks(peaks[channel] + found, MAX_PEAKS - found, tmpBuf,
 				ADC_BUF_SIZE, start, 1, threshold, 50);
 
 		int16_t lastValue = 0;
 #if DEBUG_DATA
 		printf("ch %d found:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
-		int lastIndex = peaks[0];
+		int lastIndex = peaks[channel][0];
 		for (int i = 0; i < found; i++) {
-			printf("%d\t%d\t%+d\t%d\t%+d\n", i, peaks[i], peaks[i] - lastIndex, tmpBuf[peaks[i]], tmpBuf[peaks[i]] - lastValue);
-			lastIndex = peaks[i];
-			lastValue = tmpBuf[peaks[i]];
+			printf("%d\t%d\t%+d\t%d\t%+d\n", i, peaks[channel][i], peaks[channel][i] - lastIndex, tmpBuf[peaks[channel][i]], tmpBuf[peaks[channel][i]] - lastValue);
+			lastIndex = peaks[channel][i];
+			lastValue = tmpBuf[peaks[channel][i]];
 		}
 #endif
 
@@ -145,32 +153,32 @@ void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 		lastValue = 0;
 		if (found) {
 			for (int i = 0; i < found; i++) {
-				if (tmpBuf[peaks[i]] - lastValue < 0)
-					tmpBuf[peaks[i]] = lastValue;
-				lastValue = tmpBuf[peaks[i]];
+				if (tmpBuf[peaks[channel][i]] - lastValue < 0)
+					tmpBuf[peaks[channel][i]] = lastValue;
+				lastValue = tmpBuf[peaks[channel][i]];
 			}
 			//trim off any trailing flat peaks (ones that are the same as the previous sample)
 			while (found >= 2
-					&& tmpBuf[peaks[found - 1]] == tmpBuf[peaks[found - 2]])
+					&& tmpBuf[peaks[channel][found - 1]] == tmpBuf[peaks[channel][found - 2]])
 				found--;
 
-#if DEBUG_DATA
+//#if DEBUG_DATA
 			printf("ch %d flattened:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
-			int lastIndex = peaks[0];
+			int lastIndex = peaks[channel][0];
 			int16_t lastValue = 0;
 			for (int i = 0; i < found; i++) {
-				printf("%d\t%d\t%+d\t%d\t%+d\n", i, peaks[i], peaks[i] - lastIndex, tmpBuf[peaks[i]], tmpBuf[peaks[i]] - lastValue);
-				lastIndex = peaks[i];
-				lastValue = tmpBuf[peaks[i]];
+				printf("%d\t%d\t%+d\t%d\t%+d\n", i, peaks[channel][i], peaks[channel][i] - lastIndex, tmpBuf[peaks[channel][i]], tmpBuf[peaks[channel][i]] - lastValue);
+				lastIndex = peaks[channel][i];
+				lastValue = tmpBuf[peaks[channel][i]];
 			}
-#endif
+//#endif
 		}
 
 		//calc total then mean
 		float32_t Xt = 0, Yt = 0;
 		for (int i = 0; i < found; i++) {
-			Xt += peaks[i];
-			Yt += tmpBuf[peaks[i]];
+			Xt += peaks[channel][i];
+			Yt += tmpBuf[peaks[channel][i]];
 		}
 		//q16.16
 		float32_t Xm = Xt / found;
@@ -180,8 +188,8 @@ void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 		//https://www.varsitytutors.com/hotmath/hotmath_help/topics/line-of-best-fit
 		float32_t xy = 0, x2 = 0;
 		for (int i = 0; i < found; i++) {
-			float32_t xd = peaks[i] - Xm;
-			float32_t yd = tmpBuf[peaks[i]] - Ym;
+			float32_t xd = peaks[channel][i] - Xm;
+			float32_t yd = tmpBuf[peaks[channel][i]] - Ym;
 			xy += xd * yd;
 			x2 += xd * xd;
 		}
@@ -194,8 +202,15 @@ void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		printf("raw range %d-%d\n", rawMin, rawMax);
 
-		printf("Xm=%d\tYm=%d\txy=%d\tx2=%d\tm=%d\tb=%d\txi=%d\n", (int) Xm,
-				(int) Ym, (int) xy, (int) x2, (int) m, (int) b, (int) xi);
+		printf("Xm=%d\tYm=%d\txy=%d\tx2=%d\tm*1000=%d\tb=%d\txi=%d\n", (int) Xm,
+				(int) Ym, (int) xy, (int) x2, (int) (m*1000.0), (int) b, (int) xi);
+
+		if (found < 2 || xi <= 0 || m < .01 || xi >= 2048) {
+			printf("ch %d\n", channel);
+			for (int i = 0; i < ADC_BUF_SIZE; i++) {
+				printf("%d\n", tmpBuf2[i]);
+			}
+		}
 
 		timer2 = ms - timer;
 	}
@@ -208,6 +223,7 @@ void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 	printf("hit: %d, %d, %d, %d, deltas: %d, %d, %d in %dms\n", peakIndex[0],
 			peakIndex[1], peakIndex[2], peakIndex[3], delay12, delay13, delay14,
 			timer3);
+	return !(peakIndex[0] && peakIndex[1] && peakIndex[2] && peakIndex[3]);
 }
 
 /**
@@ -269,8 +285,8 @@ int findPeaks(int *peaks, int peaksSize, q15_t *data, int size, int start,
 	return 0;
 }
 
-int findThreshold(q15_t *pInt, int size, q15_t threshold) {
-	for (int i = 0; i < size; i++) {
+int findThreshold(q15_t *pInt, int size, int start, q15_t threshold) {
+	for (int i = start; i < size; i++) {
 		if (pInt[i] >= threshold)
 			return i;
 	}

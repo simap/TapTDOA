@@ -8,6 +8,6 @@ void setup();
 
 void loop();
 
-void analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr);
+int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr);
 
 #endif

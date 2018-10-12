@@ -529,7 +529,7 @@ static void MX_OPAMP1_Init(void)
   hopamp1.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO2;
   hopamp1.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
   hopamp1.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
-  hopamp1.Init.PgaGain = OPAMP_PGA_GAIN_4;
+  hopamp1.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp1.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp1) != HAL_OK)
   {
@@ -547,7 +547,7 @@ static void MX_OPAMP2_Init(void)
   hopamp2.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO2;
   hopamp2.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
   hopamp2.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
-  hopamp2.Init.PgaGain = OPAMP_PGA_GAIN_4;
+  hopamp2.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp2.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp2) != HAL_OK)
   {
@@ -565,7 +565,7 @@ static void MX_OPAMP3_Init(void)
   hopamp3.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO2;
   hopamp3.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
   hopamp3.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
-  hopamp3.Init.PgaGain = OPAMP_PGA_GAIN_4;
+  hopamp3.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp3.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp3) != HAL_OK)
   {
@@ -583,7 +583,7 @@ static void MX_OPAMP4_Init(void)
   hopamp4.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO3;
   hopamp4.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
   hopamp4.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
-  hopamp4.Init.PgaGain = OPAMP_PGA_GAIN_4;
+  hopamp4.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp4.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp4) != HAL_OK)
   {
