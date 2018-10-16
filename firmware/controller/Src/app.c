@@ -239,7 +239,7 @@ void loop() {
 	if (HAL_DMA_GetState(&hdma_tim4_up) == HAL_DMA_STATE_READY && pbCheckDone(&pb)) {
 		//TODO reset the timer counter or it can cut clocks, this seems to transfer immediately
 		htim4.Instance->CNT = 0;
-		HAL_DMA_Start_IT(&hdma_tim4_up, ledBuffer, &GPIOB->ODR, LED_BUFFER_SIZE);
+		HAL_DMA_Start_IT(&hdma_tim4_up, ledBuffer, ((uint32_t)&GPIOC->ODR) + 1, LED_BUFFER_SIZE);
 	}
 
 

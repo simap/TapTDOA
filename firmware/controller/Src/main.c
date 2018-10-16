@@ -97,13 +97,13 @@ static void MX_TIM3_Init(void);
 static void MX_OPAMP4_Init(void);
 static void MX_ADC4_Init(void);
 static void MX_DAC1_Init(void);
-static void MX_OPAMP1_Init(void);
 static void MX_OPAMP3_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_OPAMP1_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
@@ -152,7 +152,6 @@ int main(void)
   MX_OPAMP4_Init();
   MX_ADC4_Init();
   MX_DAC1_Init();
-  MX_OPAMP1_Init();
   MX_OPAMP3_Init();
   MX_ADC1_Init();
   MX_ADC3_Init();
@@ -160,6 +159,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USB_DEVICE_Init();
   MX_TIM4_Init();
+  MX_OPAMP1_Init();
   /* USER CODE BEGIN 2 */
 
   setup();
@@ -182,7 +182,7 @@ int main(void)
 
 }
 
-/**els
+/**
   * @brief System Clock Configuration
   * @retval None
   */
@@ -301,7 +301,7 @@ static void MX_ADC1_Init(void)
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
@@ -357,7 +357,7 @@ static void MX_ADC2_Init(void)
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   if (HAL_ADC_ConfigChannel(&hadc2, &sConfig) != HAL_OK)
@@ -422,7 +422,7 @@ static void MX_ADC3_Init(void)
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   if (HAL_ADC_ConfigChannel(&hadc3, &sConfig) != HAL_OK)
@@ -478,7 +478,7 @@ static void MX_ADC4_Init(void)
   sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
-  sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_181CYCLES_5;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
   if (HAL_ADC_ConfigChannel(&hadc4, &sConfig) != HAL_OK)
@@ -526,9 +526,9 @@ static void MX_OPAMP1_Init(void)
 
   hopamp1.Instance = OPAMP1;
   hopamp1.Init.Mode = OPAMP_PGA_MODE;
-  hopamp1.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO2;
+  hopamp1.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO0;
   hopamp1.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
-  hopamp1.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
+  hopamp1.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_IO1;
   hopamp1.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp1.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp1) != HAL_OK)
@@ -544,9 +544,9 @@ static void MX_OPAMP2_Init(void)
 
   hopamp2.Instance = OPAMP2;
   hopamp2.Init.Mode = OPAMP_PGA_MODE;
-  hopamp2.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO2;
+  hopamp2.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO0;
   hopamp2.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
-  hopamp2.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
+  hopamp2.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_IO0;
   hopamp2.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp2.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp2) != HAL_OK)
@@ -562,9 +562,9 @@ static void MX_OPAMP3_Init(void)
 
   hopamp3.Instance = OPAMP3;
   hopamp3.Init.Mode = OPAMP_PGA_MODE;
-  hopamp3.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO2;
+  hopamp3.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO0;
   hopamp3.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
-  hopamp3.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
+  hopamp3.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_IO1;
   hopamp3.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp3.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp3) != HAL_OK)
@@ -582,7 +582,7 @@ static void MX_OPAMP4_Init(void)
   hopamp4.Init.Mode = OPAMP_PGA_MODE;
   hopamp4.Init.NonInvertingInput = OPAMP_NONINVERTINGINPUT_IO3;
   hopamp4.Init.TimerControlledMuxmode = OPAMP_TIMERCONTROLLEDMUXMODE_DISABLE;
-  hopamp4.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_NO;
+  hopamp4.Init.PgaConnect = OPAMP_PGA_CONNECT_INVERTINGINPUT_IO0;
   hopamp4.Init.PgaGain = OPAMP_PGA_GAIN_2;
   hopamp4.Init.UserTrimming = OPAMP_TRIMMING_FACTORY;
   if (HAL_OPAMP_Init(&hopamp4) != HAL_OK)
@@ -765,22 +765,23 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct;
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
-                          |GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_8 
+                          |GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PB2 PB3 PB4 PB5 
-                           PB6 PB7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5 
-                          |GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pins : PC13 PC14 PC15 PC8 
+                           PC9 PC10 PC11 PC12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15|GPIO_PIN_8 
+                          |GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
 }
 
