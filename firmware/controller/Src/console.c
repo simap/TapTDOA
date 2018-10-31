@@ -2,6 +2,7 @@
 #include "usb_device.h"
 #include <stdbool.h>
 #include "usbd_cdc_if.h"
+#include "assert.h"
 
 
 extern UART_HandleTypeDef huart1;
@@ -11,44 +12,59 @@ extern DMA_HandleTypeDef hdma_memtomem_dma1_channel2;
 
 
 #define USE_USB_CONSOLE 1
+#define USE_BUFFER 1
 
-//#define CONSOLE_BUFFER 1024
-//
-//static char buffer[CONSOLE_BUFFER];
-//
 
-//static volatile bool serialComDone;
-///*
-// * The following two functions are used to support the stdio output functions.
-// */
-//int _write(int file, char *outgoing, int len) {
-//  HAL_StatusTypeDef status;
-//
-//  serialComDone = false;
-//  status = HAL_UART_Transmit_DMA(&huart1, (uint8_t *) outgoing, len);
-//  if (HAL_OK != status) {
-//    serialComDone = true;
-//    len = -1;
-//  }
-//  while (serialComDone == false) {
-//    /* Hang around until the DMA complete interrupt fires */
-//  }
-//
-//  return (len);
-//}
-//
-//void HAL_UART_TxCpltCallback(UART_HandleTypeDef* huart) {
-//  serialComDone = true;
-//}
+#if USE_BUFFER
+#define BUFFER_MAX 64
+static uint8_t buffer[BUFFER_MAX];
+static volatile int bufferPos = 0;
+#endif
 
 #if USE_USB_CONSOLE
+
+
+void flushConsole() {
+#if USE_BUFFER
+	uint8_t res;
+	assert(bufferPos <= BUFFER_MAX);
+
+	if (bufferPos > 0) {
+		do {
+			res = CDC_Transmit_FS(buffer, bufferPos);
+		} while (res == USBD_BUSY);
+	}
+	bufferPos = 0;
+#endif
+}
 
 int _write(int file, char *outgoing, int len) {
 	uint8_t res;
 
+#if USE_BUFFER
+
+	int remain = len;
+	while (remain > 0) {
+
+		if (remain > BUFFER_MAX - bufferPos) {
+			flushConsole();
+		}
+
+		int toCopy = remain > BUFFER_MAX - bufferPos ? BUFFER_MAX - bufferPos : remain;
+		toCopy = 1;
+
+		memcpy(buffer + bufferPos, outgoing, toCopy);
+		bufferPos += toCopy;
+		remain -= toCopy;
+		outgoing += toCopy;
+	}
+
+#else
+
 	do {
 		res = CDC_Transmit_FS(outgoing, len);
 	} while (res == USBD_BUSY);
+#endif
 
 	return len;
 }

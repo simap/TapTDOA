@@ -2,12 +2,15 @@
 #include "usb_device.h"
 #include "app.h"
 #include "pixelBlaster.h"
+#include "console.h"
 
 #include <stdint.h>
 #include <stdbool.h>
 
 #define ARM_MATH_CM4
 #include "arm_math.h"
+
+int _write(int file, char *outgoing, int len);
 
 extern ADC_HandleTypeDef hadc1;
 extern ADC_HandleTypeDef hadc2;
@@ -97,7 +100,7 @@ void setOpAmpGainAndDac(int gain) {
 	//	VM_SEL
 	//	10: Resistor feedback output (PGA mode)
 	//	11: follower mode
-	uint32_t csr;
+	uint32_t csr = 0;
 	switch(gain) {
 		case 1:
 			csr = 0b11 << OPAMP1_CSR_VMSEL_Pos; //set to follower
@@ -212,14 +215,44 @@ void armAdcWatchdogs(void) {
 }
 
 
+uint32_t hexShort(uint16_t v) {
+	static const char digits[513] =
+			"000102030405060708090A0B0C0D0E0F"
+			"101112131415161718191A1B1C1D1E1F"
+			"202122232425262728292A2B2C2D2E2F"
+			"303132333435363738393A3B3C3D3E3F"
+			"404142434445464748494A4B4C4D4E4F"
+			"505152535455565758595A5B5C5D5E5F"
+			"606162636465666768696A6B6C6D6E6F"
+			"707172737475767778797A7B7C7D7E7F"
+			"808182838485868788898A8B8C8D8E8F"
+			"909192939495969798999A9B9C9D9E9F"
+			"A0A1A2A3A4A5A6A7A8A9AAABACADAEAF"
+			"B0B1B2B3B4B5B6B7B8B9BABBBCBDBEBF"
+			"C0C1C2C3C4C5C6C7C8C9CACBCCCDCECF"
+			"D0D1D2D3D4D5D6D7D8D9DADBDCDDDEDF"
+			"E0E1E2E3E4E5E6E7E8E9EAEBECEDEEEF"
+			"F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF";
+	union {
+		struct {
+			uint16_t a,b;
+		} p;
+		uint32_t word;
+	} res;
+
+	res.p.b = *((uint16_t *)&digits[(v & 0xff) << 1]);
+	res.p.a = *((uint16_t *)&digits[((v>>8) & 0xff) << 1]);
+	return res.word;
+}
 
 uint32_t helloTimer;
 
 void loop() {
-//	if (ms - helloTimer > 5000) {
-//		helloTimer = ms;
-//		printf("hi\n");
-//	}
+	if (ms - helloTimer > 5000) {
+		helloTimer = ms;
+		printf("hi\n");
+		flushConsole();
+	}
 
 
 
@@ -239,28 +272,32 @@ void loop() {
 	if (HAL_DMA_GetState(&hdma_tim4_up) == HAL_DMA_STATE_READY && pbCheckDone(&pb)) {
 		//TODO reset the timer counter or it can cut clocks, this seems to transfer immediately
 		htim4.Instance->CNT = 0;
-		HAL_DMA_Start_IT(&hdma_tim4_up, ledBuffer, ((uint32_t)&GPIOC->ODR) + 1, LED_BUFFER_SIZE);
+		HAL_DMA_Start_IT(&hdma_tim4_up, (uint32_t) ledBuffer, ((uint32_t)&GPIOC->ODR) + 1, LED_BUFFER_SIZE);
 	}
-
-
 
 	if (triggerDone) {
 		if (ms - lastHitMs > 500) {
 
 			int res = analyzeDelays(cbuf, dmaCndtr);
 
-			if (res) {
-				printf("Dump raw data:\nch1\tch2\tch3\tch4\n", dmaCndtr);
-				for (int i = 0; i < ADC_BUF_SIZE; i++) {
-					int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
-					printf("%u\t%u\t%u\t%u\n", cbuf[0][index], cbuf[1][index], cbuf[2][index], cbuf[3][index]);
-				}
-				printf("=========\n");
+			printf("Raw data:\nch1\tch2\tch3\tch4\n");
+
+			union {
+				uint32_t vars[4];
+				char bytes[20];
+			} buf;
+
+			for (int16_t *a = cbuf[0], *b = cbuf[1], *c = cbuf[2], *d = cbuf[3]; a < &cbuf[0][ADC_BUF_SIZE]; ) {
+				buf.vars[0] = hexShort(*a++);
+				buf.vars[1] = hexShort(*b++);
+				buf.vars[2] = hexShort(*c++);
+				buf.vars[3] = hexShort(*d++);
+				buf.bytes[16] = '\n';
+				_write(0, buf.bytes, 17);
 			}
-
-
+			printf("=========\n");
+			flushConsole();
 			lastHitMs = ms;
-
 		}
 
 		LL_TIM_EnableCounter(TIM3);

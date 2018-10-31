@@ -162,7 +162,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 					&& tmpBuf[peaks[channel][found - 1]] == tmpBuf[peaks[channel][found - 2]])
 				found--;
 
-//#if DEBUG_DATA
+#if DEBUG_DATA
 			printf("ch %d flattened:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
 			int lastIndex = peaks[channel][0];
 			int16_t lastValue = 0;
@@ -171,7 +171,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 				lastIndex = peaks[channel][i];
 				lastValue = tmpBuf[peaks[channel][i]];
 			}
-//#endif
+#endif
 		}
 
 		//calc total then mean
@@ -200,17 +200,17 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		peakIndex[channel] = xi;
 
-		printf("raw range %d-%d\n", rawMin, rawMax);
-
-		printf("Xm=%d\tYm=%d\txy=%d\tx2=%d\tm*1000=%d\tb=%d\txi=%d\n", (int) Xm,
+		printf("ch=%d\tmin=%d\tmax=%d\tXm=%d\tYm=%d\txy=%d\tx2=%d\tm*1000=%d\tb=%d\txi=%d\n", channel, rawMin, rawMax, (int) Xm,
 				(int) Ym, (int) xy, (int) x2, (int) (m*1000.0), (int) b, (int) xi);
 
+#if DEBUG_DATA
 		if (found < 2 || xi <= 0 || m < .01 || xi >= 2048) {
 			printf("ch %d\n", channel);
 			for (int i = 0; i < ADC_BUF_SIZE; i++) {
 				printf("%d\n", tmpBuf2[i]);
 			}
 		}
+#endif
 
 		timer2 = ms - timer;
 	}
