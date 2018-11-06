@@ -287,11 +287,12 @@ void loop() {
 				char bytes[20];
 			} buf;
 
-			for (int16_t *a = cbuf[0], *b = cbuf[1], *c = cbuf[2], *d = cbuf[3]; a < &cbuf[0][ADC_BUF_SIZE]; ) {
-				buf.vars[0] = hexShort(*a++);
-				buf.vars[1] = hexShort(*b++);
-				buf.vars[2] = hexShort(*c++);
-				buf.vars[3] = hexShort(*d++);
+			for (int i = 0; i < ADC_BUF_SIZE; i++) {
+				int index = (ADC_BUF_SIZE + i - dmaCndtr + 1) % ADC_BUF_SIZE;
+				buf.vars[0] = hexShort(cbuf[0][index]);
+				buf.vars[1] = hexShort(cbuf[1][index]);
+				buf.vars[2] = hexShort(cbuf[2][index]);
+				buf.vars[3] = hexShort(cbuf[3][index]);
 				buf.bytes[16] = '\n';
 				_write(0, buf.bytes, 17);
 			}
