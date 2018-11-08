@@ -136,7 +136,10 @@ void setup() {
 	memset(ledBuffer, 0, LED_BUFFER_SIZE);
 
 //	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
-	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 1024, 1024);
+	//gain 2x
+//	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 1024, 1024);
+	//gain 4x
+	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 512, 512);
 
 //	setOpAmpGainAndDac(4);
 
@@ -248,11 +251,11 @@ uint32_t hexShort(uint16_t v) {
 uint32_t helloTimer;
 
 void loop() {
-	if (ms - helloTimer > 5000) {
-		helloTimer = ms;
-		printf("hi\n");
-		flushConsole();
-	}
+//	if (ms - helloTimer > 5000) {
+//		helloTimer = ms;
+//		printf("hi\n");
+//		flushConsole();
+//	}
 
 
 
@@ -280,6 +283,7 @@ void loop() {
 
 			int res = analyzeDelays(cbuf, dmaCndtr);
 
+			flushConsole();
 			printf("Raw data:\nch1\tch2\tch3\tch4\n");
 
 			union {

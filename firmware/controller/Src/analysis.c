@@ -124,9 +124,9 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 		threshold = maxValue / 2;
 		int start = findThreshold(tmpBuf, ADC_BUF_SIZE, 0, threshold);
 
-#if DEBUG_DATA
+//#if DEBUG_DATA
 		printf("max=%d\t@%d\tthresh=%d\tstart=%d\n", maxValue, maxIndex, threshold, start);
-#endif
+//#endif
 
 		threshold = maxValue / 25;
 		threshold = threshold > 5 ? threshold : 5;
@@ -162,7 +162,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 					&& tmpBuf[peaks[channel][found - 1]] == tmpBuf[peaks[channel][found - 2]])
 				found--;
 
-#if DEBUG_DATA
+//#if DEBUG_DATA
 			printf("ch %d flattened:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
 			int lastIndex = peaks[channel][0];
 			int16_t lastValue = 0;
@@ -171,7 +171,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 				lastIndex = peaks[channel][i];
 				lastValue = tmpBuf[peaks[channel][i]];
 			}
-#endif
+//#endif
 		}
 
 		//calc total then mean
