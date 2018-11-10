@@ -1,14 +1,11 @@
 #include "stm32f3xx_hal.h"
 #include "usb_device.h"
-#include "app.h"
 #include "pixelBlaster.h"
 #include "console.h"
 
-#include <stdint.h>
-#include <stdbool.h>
 
-#define ARM_MATH_CM4
-#include "arm_math.h"
+#include "app.h"
+
 
 int _write(int file, char *outgoing, int len);
 
@@ -87,11 +84,24 @@ volatile enum {
  * TODO ws2812: if we need to interrupt at 800khz, thats about every 90 cycles. too much? maybe clock stretch?
  */
 
-void setAdcWd(uint16_t low, uint16_t high) {
-	uint32_t tr1 = (high << 16) | low;
+void setAdcWd() {
+	int w = 150, m;
+	uint32_t tr1;
+
+	m = getMeian(0);
+	tr1 = ((m + w) << 16) | (m - w);
 	ADC1->TR1 = tr1;
+
+	m = getMeian(1);
+	tr1 = ((m + w) << 16) | (m - w);
 	ADC2->TR1 = tr1;
+
+	m = getMeian(2);
+	tr1 = ((m + w) << 16) | (m - w);
 	ADC3->TR1 = tr1;
+
+	m = getMeian(3);
+	tr1 = ((m + w) << 16) | (m - w);
 	ADC4->TR1 = tr1;
 }
 
@@ -135,7 +145,9 @@ void setup() {
 	pbInit(&pb, ledBuffer, LED_BUFFER_SIZE);
 	memset(ledBuffer, 0, LED_BUFFER_SIZE);
 
+	//16x
 //	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
+
 	//gain 2x
 //	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 1024, 1024);
 	//gain 4x
@@ -173,8 +185,8 @@ void setup() {
 	HAL_ADC_Start_DMA(&hadc3, (uint32_t *) &cbuf[2][0], ADC_BUF_SIZE);
 	HAL_ADC_Start_DMA(&hadc4, (uint32_t *) &cbuf[3][0], ADC_BUF_SIZE);
 
-//	disarmAdcWatchdogs();
-	setAdcWd(2020 - 75, 2020 + 75);
+	disarmAdcWatchdogs();
+
 
 
 	//let things settle on powerup
@@ -196,6 +208,12 @@ void setup() {
 	TIM4->DIER |= TIM_DIER_UDE; //Update DMA request enable
 	HAL_TIM_Base_Start(&htim4);
 
+	HAL_Delay(100);
+
+	seedMeans(cbuf);
+
+	setAdcWd();
+	armAdcWatchdogs();
 }
 
 void disarmAdcWatchdogs(void) {
@@ -251,13 +269,11 @@ uint32_t hexShort(uint16_t v) {
 uint32_t helloTimer;
 
 void loop() {
-//	if (ms - helloTimer > 5000) {
-//		helloTimer = ms;
-//		printf("hi\n");
-//		flushConsole();
-//	}
-
-
+	if (ms - helloTimer > 5000) {
+		helloTimer = ms;
+		printf("hi\n");
+		flushConsole();
+	}
 
 #if 0
 	memcpy(cbuf[0], sample1 + 1500, ADC_BUF_SIZE * sizeof(q15_t));
