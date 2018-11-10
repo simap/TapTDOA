@@ -8,6 +8,8 @@
 #define ARM_MATH_CM4
 #include "arm_math.h"
 
+#include "fastHex.h"
+
 #define ADC_BUF_SIZE (1024*2)
 
 void setup();
