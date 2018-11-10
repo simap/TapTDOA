@@ -142,12 +142,12 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		timerTemp = ms - timer;
 
-#if DEBUG_DATA
-		printf("filtered ch %d\n", channel);
-		for (int i = 0; i < ADC_BUF_SIZE; i++) {
-			printf("%d\n", tmpBuf2[i]);
-		}
-#endif
+//#if DEBUG_DATA
+//		printf("filtered ch %d\n", channel);
+//		for (int i = 0; i < ADC_BUF_SIZE; i++) {
+//			printf("%d\n", tmpBuf2[i]);
+//		}
+//#endif
 		//find a spot to start searching, basic threshold?
 		//compare a strong-near hit vs a far-weak hit
 		//should we use max to get a range or some fixed value? perhaps start with fixed?
@@ -183,15 +183,15 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 				ADC_BUF_SIZE, start, 1, threshold, 30);
 
 		int16_t lastValue = 0;
-#if DEBUG_DATA
-		printf("ch %d found:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
-		int lastIndex = peaks[channel][0];
-		for (int i = 0; i < found; i++) {
-			printf("%d\t%d\t%+d\t%d\t%+d\n", i, peaks[channel][i], peaks[channel][i] - lastIndex, tmpBuf[peaks[channel][i]], tmpBuf[peaks[channel][i]] - lastValue);
-			lastIndex = peaks[channel][i];
-			lastValue = tmpBuf[peaks[channel][i]];
-		}
-#endif
+//#if DEBUG_DATA
+//		printf("ch %d found:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
+//		int lastIndex = peaks[channel][0];
+//		for (int i = 0; i < found; i++) {
+//			printf("%d\t%d\t%+d\t%d\t%+d\n", i, peaks[channel][i], peaks[channel][i] - lastIndex, tmpBuf[peaks[channel][i]], tmpBuf[peaks[channel][i]] - lastValue);
+//			lastIndex = peaks[channel][i];
+//			lastValue = tmpBuf[peaks[channel][i]];
+//		}
+//#endif
 
 		//TODO filter any peaks that decline, only looking for upward slope
 		//maybe flattening them is sufficient
@@ -257,7 +257,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 			peakIndex[channel] = start;
 		}
 
-//#if DEBUG_DATA
+#if DEBUG_DATA
 //		if (found < 2 || xi <= 0 || m < .01 || xi >= 2048) {
 			printf("filtered ch %d\n", channel);
 			union {
@@ -272,7 +272,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 			printf("=========\n");
 			flushConsole();
 //		}
-//#endif
+#endif
 
 		timer2 = ms - timer;
 	}

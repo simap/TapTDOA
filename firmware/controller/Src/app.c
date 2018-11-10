@@ -271,6 +271,7 @@ void loop() {
 			int res = analyzeDelays(cbuf, dmaCndtr);
 
 			flushConsole();
+#if 0
 			printf("Raw data:\nch1\tch2\tch3\tch4\n");
 
 			union {
@@ -289,6 +290,7 @@ void loop() {
 			}
 			printf("=========\n");
 			flushConsole();
+#endif
 			lastHitMs = ms;
 		}
 
