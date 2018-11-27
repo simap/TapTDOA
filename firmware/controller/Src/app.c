@@ -85,7 +85,7 @@ volatile enum {
  */
 
 void setAdcWd() {
-	int w = 150, m;
+	int w = 300, m;
 	uint32_t tr1;
 
 	m = getMeian(0);

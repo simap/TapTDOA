@@ -42,6 +42,7 @@ q15_t firState[BLOCK_SIZE + BP_NUM_TAPS];
 uint32_t blockSize = BLOCK_SIZE;
 uint32_t numBlocks = ADC_BUF_SIZE / BLOCK_SIZE;
 
+int findZeroCross(q15_t *data, int size, int start, int dir);
 int findThreshold(q15_t *pInt, int size, int start, q15_t threshold);
 int findPeaks(int *peaks, int peaksSize, q15_t *data, int size, int start,
 		int dir, q15_t threshold, int maxDistance);
@@ -140,6 +141,9 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 		//abs tmp2 -> tmp
 		arm_abs_q15(&tmpBuf2[0], &tmpBuf[0], ADC_BUF_SIZE);
 
+		//HACK: block out any potential filter noise/issues in case of a DC jump.
+		memset(tmpBuf, 0, BP_NUM_TAPS * sizeof(tmpBuf[0]));
+
 		timerTemp = ms - timer;
 
 //#if DEBUG_DATA
@@ -163,6 +167,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		q15_t threshold, maxValue;
 		uint32_t maxIndex;
+
 		arm_max_q15(tmpBuf, ADC_BUF_SIZE, &maxValue, &maxIndex);
 
 		threshold = maxValue / 2;
@@ -251,10 +256,10 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		} else if (found == 1){
 			printf("Didn't find enough peaks for slope\n");
-			peakIndex[channel] = peaks[channel][0];
+			peakIndex[channel] = findZeroCross(tmpBuf2, ADC_BUF_SIZE, peaks[channel][0], -1);
 		} else {
 			printf("Didn't find any peaks!\n");
-			peakIndex[channel] = start;
+			peakIndex[channel] = findZeroCross(tmpBuf2, ADC_BUF_SIZE, start, -1);
 		}
 
 #if DEBUG_DATA
@@ -288,6 +293,15 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 			peakIndex[1], peakIndex[2], peakIndex[3], delay12, delay13, delay14,
 			timer3);
 	return !(peakIndex[0] && peakIndex[1] && peakIndex[2] && peakIndex[3]);
+}
+
+int findZeroCross(q15_t *data, int size, int start, int dir) {
+	int start2 = start;
+	for (; start2 >= 0 && start2 < size; start2 += dir) {
+		if (data[start2] <= 0)
+			return start2;
+	}
+	return start;
 }
 
 /**
