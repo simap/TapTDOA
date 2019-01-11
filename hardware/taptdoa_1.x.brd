@@ -241,6 +241,7 @@
 <text x="54.5338" y="16.7894" size="0.8128" layer="25">HP4</text>
 <text x="45.2374" y="16.2052" size="0.8128" layer="25">LP4</text>
 <text x="44.2722" y="11.0998" size="0.8128" layer="25">LP3</text>
+<text x="13.97" y="2.54" size="1.778" layer="25">V1.5</text>
 </plain>
 <libraries>
 <library name="ST Microelctronics_By_element14_Batch_1">
