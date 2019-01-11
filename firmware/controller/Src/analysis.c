@@ -24,6 +24,22 @@ const q15_t fir1[] = { 1452, 1371, 1228, 1014, 718, 330, -155, -733, -1385,
 		1126, -582, -2007, -3086, -3793, -4132, -4139, -3867, -3386, -2766,
 		-2079, -1385, -733, -155, 330, 718, 1014, 1228, 1371, 1452, 0 };
 
+//s=150; bp = fir1(s,[1900/ny, 2100/ny], 'pass')*(2^19);
+//#define BP_NUM_TAPS              (152)
+//const q15_t fir1[] = { 891, 819, 702, 542, 340, 101, -166, -456, -752, -1039,
+//		-1297, -1503, -1635, -1672, -1595, -1392, -1059, -599, -28, 627, 1330,
+//		2035, 2689, 3239, 3630, 3814, 3753, 3424, 2821, 1957, 868, -390, -1746,
+//		-3112, -4394, -5493, -6319, -6790, -6847, -6454, -5605, -4326, -2675,
+//		-739, 1366, 3512, 5555, 7352, 8770, 9695, 10040, 9756, 8833, 7306, 5249,
+//		2778, 40, -2794, -5544, -8027, -10072, -11536, -12308, -12323, -11562,
+//		-10060, -7900, -5211, -2158, 1066, 4258, 7211, 9736, 11667, 12878,
+//		13291, 12878, 11667, 9736, 7211, 4258, 1066, -2158, -5211, -7900,
+//		-10060, -11562, -12323, -12308, -11536, -10072, -8027, -5544, -2794, 40,
+//		2778, 5249, 7306, 8833, 9756, 10040, 9695, 8770, 7352, 5555, 3512, 1366,
+//		-739, -2675, -4326, -5605, -6454, -6847, -6790, -6319, -5493, -4394,
+//		-3112, -1746, -390, 868, 1957, 2821, 3424, 3753, 3814, 3630, 3239, 2689,
+//		2035, 1330, 627, -28, -599, -1059, -1392, -1595, -1672, -1635, -1503,
+//		-1297, -1039, -752, -456, -166, 101, 340, 542, 702, 819, 891, 0 };
 
 q15_t tmpBuf[ADC_BUF_SIZE];
 q15_t tmpBuf2[ADC_BUF_SIZE];
@@ -170,22 +186,22 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 
 		arm_max_q15(tmpBuf, ADC_BUF_SIZE, &maxValue, &maxIndex);
 
-		threshold = maxValue / 2;
+		threshold = maxValue / 5;
 		int start = findThreshold(tmpBuf, ADC_BUF_SIZE, 0, threshold);
 
 //#if DEBUG_DATA
-		printf("max=%d\t@%d\tthresh=%d\tstart=%d\n", maxValue, maxIndex, threshold, start);
+		printf("ch=%d\tmax=%d\t@%d\tthresh=%d\tstart=%d\n", channel, maxValue, maxIndex, threshold, start);
 //#endif
 
 		threshold = maxValue / 50;
-		threshold = threshold < 1 ? 1 : threshold;
-		threshold = threshold > 5 ? threshold : 5;
+		threshold = threshold < 2 ? 2 : threshold;
+//		threshold = threshold > 5 ? threshold : 5;
 		int found = findPeaks(peaks[channel], 2, tmpBuf, ADC_BUF_SIZE, start, -1,
 				threshold, 50);
 
 		threshold = maxValue / 5;
 		found += findPeaks(peaks[channel] + found, MAX_PEAKS - found, tmpBuf,
-				ADC_BUF_SIZE, start, 1, threshold, 30);
+				ADC_BUF_SIZE, start, 1, threshold, 50);
 
 		int16_t lastValue = 0;
 //#if DEBUG_DATA
@@ -212,7 +228,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 					&& tmpBuf[peaks[channel][found - 1]] == tmpBuf[peaks[channel][found - 2]])
 				found--;
 
-//#if DEBUG_DATA
+#if DEBUG_DATA
 			printf("ch %d flattened:\ni\tindex\tdeltaIndex\tvalue\tvalueDelta\n", channel);
 			int lastIndex = peaks[channel][0];
 			int16_t lastValue = 0;
@@ -221,7 +237,7 @@ int analyzeDelays(int16_t cbuf[4][ADC_BUF_SIZE], int dmaCndtr) {
 				lastIndex = peaks[channel][i];
 				lastValue = tmpBuf[peaks[channel][i]];
 			}
-//#endif
+#endif
 		}
 
 		if (found > 1) {

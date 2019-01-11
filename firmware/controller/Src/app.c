@@ -85,7 +85,7 @@ volatile enum {
  */
 
 void setAdcWd() {
-	int w = 300, m;
+	int w = 1300, m;
 	uint32_t tr1;
 
 	m = getMeian(0);
@@ -145,13 +145,7 @@ void setup() {
 	pbInit(&pb, ledBuffer, LED_BUFFER_SIZE);
 	memset(ledBuffer, 0, LED_BUFFER_SIZE);
 
-	//16x
-//	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 128, 128);
-
-	//gain 2x
-//	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 1024, 1024);
-	//gain 4x
-	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 512, 512);
+	HAL_DACEx_DualSetValue(&hdac1, DAC_ALIGN_12B_R, 2048/4, 2048/4);
 
 //	setOpAmpGainAndDac(4);
 
