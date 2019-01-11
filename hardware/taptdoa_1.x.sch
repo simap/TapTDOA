@@ -8721,7 +8721,7 @@ You are welcome to use this library for commercial purposes. For attribution, we
 <wire x1="9" y1="9" x2="9" y2="9.9" width="0.127" layer="21"/>
 <wire x1="9" y1="9.9" x2="0" y2="9.9" width="0.127" layer="21"/>
 <wire x1="0" y1="9.9" x2="0" y2="0" width="0.127" layer="21"/>
-<pad name="P$1" x="13.1" y="2.5" drill="1.7" shape="square"/>
+<pad name="P$1" x="13.1" y="2.5" drill="1.7" diameter="3.048" shape="square"/>
 <pad name="P$2" x="13.1" y="7.5" drill="1.7" diameter="3.048" shape="square"/>
 <wire x1="9" y1="9" x2="14.6" y2="9" width="0.127" layer="21"/>
 <wire x1="14.6" y1="9" x2="14.6" y2="1" width="0.127" layer="21"/>
@@ -10964,6 +10964,7 @@ LED</description>
 <wire x1="121.92" y1="132.08" x2="121.92" y2="137.16" width="0.1524" layer="91"/>
 <wire x1="121.92" y1="137.16" x2="129.54" y2="137.16" width="0.1524" layer="91"/>
 <junction x="129.54" y="137.16"/>
+<junction x="134.62" y="137.16"/>
 </segment>
 </net>
 <net name="N$22" class="0">
@@ -10987,6 +10988,40 @@ LED</description>
 </nets>
 </sheet>
 </sheets>
+<errors>
+<approved hash="104,1,38.1,132.08,U3,VDDA,+3V3,,,"/>
+<approved hash="104,1,38.1,129.54,U3,VDD_1,+3V3,,,"/>
+<approved hash="104,1,38.1,127,U3,VDD_2,+3V3,,,"/>
+<approved hash="104,1,38.1,124.46,U3,VDD_3,+3V3,,,"/>
+<approved hash="104,1,38.1,121.92,U3,VDD_4,+3V3,,,"/>
+<approved hash="202,1,38.1,116.84,U3,VBAT,,,,"/>
+<approved hash="202,1,-7.62,132.08,U2,NC,,,,"/>
+<approved hash="104,1,-60.96,134.62,J5,GND,N$11,,,"/>
+<approved hash="104,1,-60.96,139.7,J5,VDD,VUSB,,,"/>
+<approved hash="106,1,-86.36,134.62,ID,,,,,"/>
+<approved hash="110,1,-27.94,66.04,GND,PA13,,,,"/>
+<approved hash="110,1,-27.94,66.04,GND,PA13,,,,"/>
+<approved hash="110,1,-27.94,63.5,GND,NRST,,,,"/>
+<approved hash="110,1,-27.94,63.5,GND,NRST,,,,"/>
+<approved hash="110,1,25.4,35.56,SENSE4,OA4OUT,,,,"/>
+<approved hash="110,1,25.4,35.56,SENSE4,OA4OUT,,,,"/>
+<approved hash="110,1,165.1,58.42,N$21,N$19,,,,"/>
+<approved hash="110,1,165.1,25.4,N$23,N$20,,,,"/>
+<approved hash="111,1,165.1,58.42,N$21,,,,,"/>
+<approved hash="111,1,165.1,25.4,N$23,,,,,"/>
+<approved hash="113,1,-33.6973,70.0126,J3,,,,,"/>
+<approved hash="113,1,1.86267,85.2526,J4,,,,,"/>
+<approved hash="113,1,186.097,43.0174,J6,,,,,"/>
+<approved hash="113,1,186.097,9.99744,J7,,,,,"/>
+<approved hash="113,1,193.717,104.303,J1,,,,,"/>
+<approved hash="113,1,193.717,142.403,J2,,,,,"/>
+<approved hash="113,1,127.485,140.97,D1,,,,,"/>
+<approved hash="113,1,136.675,140.97,D2,,,,,"/>
+<approved hash="113,1,127.485,133.35,D3,,,,,"/>
+<approved hash="113,1,136.675,133.35,D4,,,,,"/>
+<approved hash="113,1,142.725,138.43,D5,,,,,"/>
+<approved hash="113,1,151.915,138.43,D6,,,,,"/>
+</errors>
 </schematic>
 </drawing>
 <compatibility>
